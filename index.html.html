@@ -607,12 +607,69 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     return `<div ${breakStyle}>${p.innerHTML}</div>`;
   }).join('');
 
+  // --- Konversi ukuran kertas & margin yang sedang aktif ke cm, untuk @page Word ---
+  const paperSizeCm = {
+    A4:     { w: 21,    h: 29.7 },
+    Letter: { w: 21.59, h: 27.94 },
+    Legal:  { w: 21.59, h: 35.56 },
+    F4:     { w: 21.5,  h: 33 },
+  };
+  const paper = paperSizeCm[document.getElementById('paperSize').value] || paperSizeCm.A4;
+
+  const marginUnit = document.getElementById('marginUnit').value;
+  const toCm = (v) => {
+    const n = parseFloat(v);
+    if (isNaN(n)) return 2.54;
+    return marginUnit === 'in' ? n * 2.54 : n;
+  };
+  const mTop = toCm(document.getElementById('marginTop').value);
+  const mBottom = toCm(document.getElementById('marginBottom').value);
+  const mLeft = toCm(document.getElementById('marginLeft').value);
+  const mRight = toCm(document.getElementById('marginRight').value);
+
   const buildFullHtml = (title) => `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'><title>${title}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<head>
+<meta charset='utf-8'>
+<title>${title}</title>
+<!--[if gte mso 9]>
+<xml>
+<w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+</w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  @page WordSection1 {
+    size: ${paper.w}cm ${paper.h}cm;
+    margin: ${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm;
+    mso-header-margin: 0cm;
+    mso-footer-margin: 0cm;
+    mso-paper-source: 0;
+  }
+  div.WordSection1 { page: WordSection1; }
+
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #111;
+    margin: 0;
+  }
+  p { margin: 0 0 10px; }
+  h1 { font-size: 24pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  h2 { font-size: 18pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  h3 { font-size: 14pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  table { border-collapse: collapse; margin: 10px 0; }
+  table td, table th { border: 1px solid #999; padding: 6px 10px; min-width: 60px; }
+  img { max-width: 100%; }
+</style>
 </head>
-<body>${bodyHtml}</body>
+<body>
+<div class="WordSection1">${bodyHtml}</div>
+</body>
 </html>`;
 
   if (window.showSaveFilePicker) {
