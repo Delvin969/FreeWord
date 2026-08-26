@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>FreeWord - Editor Dokumen Gratis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #d6d6d6;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #ribbon {
+    background: linear-gradient(#f3f3f3, #e6e6e6);
+    border-bottom: 1px solid #c8c8c8;
+    padding: 8px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+  }
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    border-right: 1px solid #d0d0d0;
+    flex-wrap: wrap;
+  }
+  .group:last-child { border-right: none; }
+  button {
+    background: #fff;
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    padding: 5px 9px;
+    cursor: pointer;
+    font-size: 13px;
+    min-width: 28px;
+  }
+  button:hover { background: #e3f0fd; border-color: #2b7de9; }
+  button:active { background: #cfe4fb; }
+  select, input[type="color"], input[type="number"] {
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    padding: 4px;
+    font-size: 13px;
+    background: #fff;
+  }
+  input[type="color"] { width: 32px; height: 28px; padding: 2px; cursor: pointer; }
+  input[type="number"] { width: 50px; }
+  .mini-label { font-size: 11px; color: #555; }
+  #statusbar {
+    background: #2b579a;
+    color: white;
+    font-size: 12px;
+    padding: 4px 14px;
+    display: flex;
+    justify-content: space-between;
+  }
+  #page-wrap {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 30px 0 80px;
+  }
+  .page-wrapper { position: relative; margin-bottom: 20px; }
+  .page {
+    background: white;
+    box-shadow: 0 0 8px rgba(0,0,0,0.25);
+    font-size: 12pt;
+    line-height: 1.5;
+    outline: none;
+    color: #111;
+  }
+  .page-label {
+    position: absolute;
+    top: -22px;
+    left: 0;
+    font-size: 11px;
+    color: #777;
+  }
+  .page-footer {
+    text-align: right;
+    font-size: 10px;
+    color: #999;
+    margin: 4px 2px 0;
+  }
+  .add-page-under {
+    display: block;
+    margin: 6px auto 0;
+    background: #fff;
+    border: 1px dashed #999;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #444;
+    cursor: pointer;
+  }
+  .add-page-under:hover { background: #e3f0fd; border-color: #2b7de9; }
+  .page img { max-width: 100%; }
+  .page table { border-collapse: collapse; margin: 10px 0; }
+  .page table td, .page table th { border: 1px solid #999; padding: 6px 10px; min-width: 60px; }
+  .page h1 { font-size: 24pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .page h2 { font-size: 18pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .page h3 { font-size: 14pt; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .page p { margin: 0 0 10px; }
+  #fileInput, #imageInput { display: none; }
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white; padding: 10px 18px; border-radius: 6px;
+    font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  @media print {
+    #ribbon, #statusbar, .page-label, .add-page-under, #toast { display: none !important; }
+    body { background: white; }
+    #page-wrap { padding: 0; gap: 0; }
+    .page-wrapper { margin-bottom: 0; page-break-after: always; }
+    .page { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="ribbon">
+  <div class="group">
+    <select id="fontName" title="Font">
+      <option>Calibri</option><option>Arial</option><option>Georgia</option>
+      <option>Times New Roman</option><option>Courier New</option><option>Verdana</option>
+    </select>
+    <select id="fontSize" title="Ukuran">
+      <option>10</option><option>11</option><option selected>12</option>
+      <option>14</option><option>16</option><option>18</option><option>24</option><option>28</option><option>36</option>
+    </select>
+  </div>
+  <div class="group">
+    <button data-cmd="bold"><b>B</b></button>
+    <button data-cmd="italic"><i>I</i></button>
+    <button data-cmd="underline"><u>U</u></button>
+    <button data-cmd="strikeThrough"><s>S</s></button>
+    <button data-cmd="superscript" title="Superscript">x²</button>
+    <button data-cmd="subscript" title="Subscript">x₂</button>
+    <button data-cmd="removeFormat" title="Hapus semua format">Hapus Format</button>
+  </div>
+  <div class="group">
+    <button data-cmd="justifyLeft">⇤</button>
+    <button data-cmd="justifyCenter">≡</button>
+    <button data-cmd="justifyRight">⇥</button>
+    <button data-cmd="justifyFull">☰</button>
+  </div>
+  <div class="group">
+    <button data-cmd="insertUnorderedList">• List</button>
+    <button data-cmd="insertOrderedList">1. List</button>
+    <button data-cmd="indent">Indent</button>
+    <button data-cmd="outdent">Outdent</button>
+  </div>
+  <div class="group">
+    <select id="blockFormat" title="Gaya">
+      <option value="P">Normal</option>
+      <option value="H1">Heading 1</option>
+      <option value="H2">Heading 2</option>
+      <option value="H3">Heading 3</option>
+    </select>
+    <select id="lineSpacing" title="Spasi Baris">
+      <option value="1">Spasi 1.0</option>
+      <option value="1.15">Spasi 1.15</option>
+      <option value="1.5" selected>Spasi 1.5</option>
+      <option value="2">Spasi 2.0</option>
+      <option value="2.5">Spasi 2.5</option>
+      <option value="3">Spasi 3.0</option>
+    </select>
+    <select id="textCase" title="Ubah Huruf">
+      <option value="">Ubah Huruf...</option>
+      <option value="upper">HURUF BESAR</option>
+      <option value="lower">huruf kecil</option>
+      <option value="title">Setiap Kata Besar</option>
+    </select>
+  </div>
+  <div class="group">
+    <input type="color" id="foreColor" title="Warna teks" value="#000000" />
+    <input type="color" id="hiliteColor" title="Highlight" value="#ffff00" />
+  </div>
+  <div class="group">
+    <button id="insertTableBtn">Tabel</button>
+    <button id="insertImageBtn">🖼️ Gambar</button>
+    <button id="insertHrBtn" title="Sisip garis">─ Garis</button>
+    <button id="insertDateBtn" title="Sisip tanggal hari ini">📅 Tanggal</button>
+    <button id="findReplaceBtn" title="Cari & Ganti">🔍 Cari</button>
+  </div>
+  <div class="group">
+    <button id="newPageBtn" style="background:#2b7de9;color:white;font-weight:bold;">📄 + Tambah Halaman</button>
+    <button data-cmd="undo">↶</button>
+    <button data-cmd="redo">↷</button>
+    <button id="printBtn">🖨️ Print</button>
+  </div>
+  <div class="group">
+    <select id="paperSize" title="Ukuran Kertas">
+      <option value="A4">A4</option>
+      <option value="Letter">Letter</option>
+      <option value="Legal">Legal</option>
+      <option value="F4">F4</option>
+    </select>
+  </div>
+  <div class="group" style="gap:6px;">
+    <span class="mini-label">Margin:</span>
+    <span class="mini-label">Atas</span><input type="number" id="marginTop" value="2.54" step="0.1" min="0" />
+    <span class="mini-label">Bawah</span><input type="number" id="marginBottom" value="2.54" step="0.1" min="0" />
+    <span class="mini-label">Kiri</span><input type="number" id="marginLeft" value="2.54" step="0.1" min="0" />
+    <span class="mini-label">Kanan</span><input type="number" id="marginRight" value="2.54" step="0.1" min="0" />
+    <select id="marginUnit">
+      <option value="cm">cm</option>
+      <option value="in">inci</option>
+    </select>
+    <button id="applyMarginBtn">Terapkan</button>
+  </div>
+  <div class="group">
+    <button id="newBtn">Baru</button>
+    <button id="openBtn">Buka File</button>
+    <button id="saveBtn" style="background:#2b7de9;color:white;font-weight:bold;">💾 Simpan (.doc)</button>
+  </div>
+  <input type="file" id="fileInput" accept=".docx,.doc,.html,.htm,.txt" />
+  <input type="file" id="imageInput" accept="image/*" />
+</div>
+
+<div id="statusbar">
+  <span id="statusText">Dokumen Baru</span>
+  <span id="wordCount">0 kata</span>
+</div>
+
+<div id="page-wrap"></div>
+
+<div id="toast"></div>
+
+<script>
+const pageWrap = document.getElementById('page-wrap');
+const statusText = document.getElementById('statusText');
+const wordCount = document.getElementById('wordCount');
+const toast = document.getElementById('toast');
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// --- Ukuran kertas (px @ 96dpi) ---
+const paperSizesPx = {
+  A4: { width: 794, minHeight: 1123 },
+  Letter: { width: 816, minHeight: 1056 },
+  Legal: { width: 816, minHeight: 1344 },
+  F4: { width: 793, minHeight: 1247 },
+};
+let currentMarginPx = { top: 96, right: 96, bottom: 96, left: 96 }; // 2.54cm default
+let lastFocusedPage = null;
+let savedRange = null;
+
+function saveCurrentSelection() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+  const node = range.commonAncestorContainer;
+  const el = node.nodeType === 3 ? node.parentElement : node;
+  if (el && el.closest && el.closest('.page')) {
+    savedRange = range.cloneRange();
+  }
+}
+
+function attachSelectionCapture(el) {
+  el.addEventListener('mousedown', saveCurrentSelection);
+  el.addEventListener('focus', saveCurrentSelection);
+}
+
+function closestPageFromRange(range) {
+  const node = range.commonAncestorContainer;
+  const el = node.nodeType === 3 ? node.parentElement : node;
+  return el ? el.closest('.page') : null;
+}
+
+function toPx(value, unit) {
+  if (unit === 'in') return Math.round(value * 96);
+  return Math.round(value * 37.795); // cm
+}
+
+function applyPageSettingsToAll() {
+  const size = paperSizesPx[document.getElementById('paperSize').value];
+  const m = currentMarginPx;
+  document.querySelectorAll('.page').forEach(p => {
+    p.style.width = size.width + 'px';
+    p.style.minHeight = size.minHeight + 'px';
+    p.style.padding = `${m.top}px ${m.right}px ${m.bottom}px ${m.left}px`;
+  });
+  document.querySelectorAll('.page-footer').forEach(f => { f.style.width = size.width + 'px'; });
+}
+
+document.getElementById('paperSize').addEventListener('change', applyPageSettingsToAll);
+
+document.getElementById('applyMarginBtn').addEventListener('click', () => {
+  const unit = document.getElementById('marginUnit').value;
+  const top = parseFloat(document.getElementById('marginTop').value);
+  const bottom = parseFloat(document.getElementById('marginBottom').value);
+  const left = parseFloat(document.getElementById('marginLeft').value);
+  const right = parseFloat(document.getElementById('marginRight').value);
+  if ([top, bottom, left, right].some(v => isNaN(v) || v < 0)) {
+    alert('Masukkan angka margin yang valid di semua kolom.');
+    return;
+  }
+  currentMarginPx = { top: toPx(top, unit), bottom: toPx(bottom, unit), left: toPx(left, unit), right: toPx(right, unit) };
+  applyPageSettingsToAll();
+  showToast(`Margin diterapkan (${unit === 'in' ? 'inci' : 'cm'}): atas ${top}, bawah ${bottom}, kiri ${left}, kanan ${right}`);
+});
+
+// --- Halaman ---
+function createPage(initialHtml, afterWrapper) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+
+  const label = document.createElement('div');
+  label.className = 'page-label';
+  wrapper.appendChild(label);
+
+  const size = paperSizesPx[document.getElementById('paperSize').value];
+  const m = currentMarginPx;
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.contentEditable = 'true';
+  page.spellcheck = true;
+  page.style.width = size.width + 'px';
+  page.style.minHeight = size.minHeight + 'px';
+  page.style.padding = `${m.top}px ${m.right}px ${m.bottom}px ${m.left}px`;
+  page.innerHTML = initialHtml || '<p><br></p>';
+  page.addEventListener('focus', () => { lastFocusedPage = page; });
+  page.addEventListener('input', updateWordCount);
+  page.addEventListener('mouseup', saveCurrentSelection);
+  page.addEventListener('keyup', saveCurrentSelection);
+  wrapper.appendChild(page);
+
+  const footer = document.createElement('div');
+  footer.className = 'page-footer';
+  footer.style.width = size.width + 'px';
+  wrapper.appendChild(footer);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-page-under';
+  addBtn.textContent = '+ Tambah Halaman Baru di Sini';
+  addBtn.addEventListener('click', () => {
+    const p = createPage('<p><br></p>', wrapper);
+    p.focus();
+    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  wrapper.appendChild(addBtn);
+
+  if (afterWrapper && afterWrapper.nextSibling) {
+    pageWrap.insertBefore(wrapper, afterWrapper.nextSibling);
+  } else {
+    pageWrap.appendChild(wrapper);
+  }
+  renumberPages();
+  return page;
+}
+
+function renumberPages() {
+  const wrappers = document.querySelectorAll('.page-wrapper');
+  const total = wrappers.length;
+  wrappers.forEach((w, i) => {
+    w.querySelector('.page-label').textContent = 'Halaman ' + (i + 1);
+    w.querySelector('.page-footer').textContent = `Halaman ${i + 1} dari ${total}`;
+  });
+}
+
+function getAllPages() {
+  return Array.from(document.querySelectorAll('.page'));
+}
+
+document.getElementById('newPageBtn').addEventListener('click', () => {
+  const pages = getAllPages();
+  const refPage = lastFocusedPage && pages.includes(lastFocusedPage) ? lastFocusedPage : pages[pages.length - 1];
+  const refWrapper = refPage ? refPage.closest('.page-wrapper') : null;
+  const newPage = createPage('<p><br></p>', refWrapper);
+  newPage.focus();
+  newPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+function withFocusedPage(fn) {
+  const page = lastFocusedPage || document.querySelector('.page');
+  if (page) { page.focus(); fn(page); }
+}
+
+document.querySelectorAll('button[data-cmd]').forEach((btn) => {
+  btn.addEventListener('click', () => withFocusedPage(() => document.execCommand(btn.dataset.cmd, false, null)));
+});
+
+document.getElementById('fontName').addEventListener('change', (e) => {
+  withFocusedPage(() => document.execCommand('fontName', false, e.target.value));
+});
+
+attachSelectionCapture(document.getElementById('fontSize'));
+document.getElementById('fontSize').addEventListener('change', (e) => {
+  const pt = e.target.value;
+  if (!savedRange) { alert('Blok/pilih teks dulu (dengan mouse) sebelum mengubah ukuran huruf.'); return; }
+  try {
+    const span = document.createElement('span');
+    span.style.fontSize = pt + 'pt';
+    const contents = savedRange.extractContents();
+    span.appendChild(contents);
+    savedRange.insertNode(span);
+    const page = span.closest ? span.closest('.page') : null;
+    if (page) { lastFocusedPage = page; page.focus(); }
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+    savedRange = newRange.cloneRange();
+    updateWordCount();
+  } catch (err) {
+    alert('Gagal mengubah ukuran huruf, coba blok teksnya lagi lalu ulangi.');
+  }
+});
+
+document.getElementById('blockFormat').addEventListener('change', (e) => {
+  withFocusedPage(() => document.execCommand('formatBlock', false, e.target.value));
+});
+
+// --- Spasi baris (line spacing) ---
+attachSelectionCapture(document.getElementById('lineSpacing'));
+document.getElementById('lineSpacing').addEventListener('change', (e) => {
+  const val = e.target.value;
+  let range = savedRange;
+  if (!range) {
+    const page = lastFocusedPage || document.querySelector('.page');
+    if (!page) return;
+    const sel = window.getSelection();
+    if (sel.rangeCount) range = sel.getRangeAt(0);
+  }
+  if (!range) { alert('Klik di dalam paragraf dulu sebelum mengubah spasi baris.'); return; }
+  const page = closestPageFromRange(range);
+  if (!page) return;
+  const candidates = page.querySelectorAll('p, li, h1, h2, h3, div');
+  let applied = false;
+  candidates.forEach((c) => {
+    if (range.intersectsNode(c)) { c.style.lineHeight = val; applied = true; }
+  });
+  if (!applied) {
+    const node = range.startContainer;
+    const el = node.nodeType === 3 ? node.parentElement : node;
+    const block = el ? el.closest('p, li, h1, h2, h3') : null;
+    if (block) block.style.lineHeight = val;
+  }
+  lastFocusedPage = page;
+  page.focus();
+  showToast('Spasi baris diterapkan: ' + val);
+});
+
+// --- Ubah huruf besar/kecil ---
+attachSelectionCapture(document.getElementById('textCase'));
+document.getElementById('textCase').addEventListener('change', (e) => {
+  const mode = e.target.value;
+  if (!mode) return;
+  if (!savedRange) { alert('Blok teks dulu sebelum mengubah huruf.'); e.target.value = ''; return; }
+  const span = document.createElement('span');
+  const contents = savedRange.extractContents();
+  span.appendChild(contents);
+  let text = span.textContent;
+  if (mode === 'upper') text = text.toUpperCase();
+  else if (mode === 'lower') text = text.toLowerCase();
+  else if (mode === 'title') text = text.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  span.textContent = text;
+  savedRange.insertNode(span);
+  const page = span.closest('.page');
+  if (page) { lastFocusedPage = page; page.focus(); }
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  const nr = document.createRange();
+  nr.selectNodeContents(span);
+  sel.addRange(nr);
+  savedRange = nr.cloneRange();
+  e.target.value = '';
+  updateWordCount();
+});
+
+document.getElementById('foreColor').addEventListener('input', (e) => {
+  withFocusedPage(() => document.execCommand('foreColor', false, e.target.value));
+});
+document.getElementById('hiliteColor').addEventListener('input', (e) => {
+  withFocusedPage(() => document.execCommand('hiliteColor', false, e.target.value));
+});
+
+document.getElementById('insertTableBtn').addEventListener('click', () => {
+  const rows = parseInt(prompt('Jumlah baris?', '3'), 10) || 3;
+  const cols = parseInt(prompt('Jumlah kolom?', '3'), 10) || 3;
+  let html = '<table>';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) html += '<td>&nbsp;</td>';
+    html += '</tr>';
+  }
+  html += '</table><p><br></p>';
+  withFocusedPage(() => document.execCommand('insertHTML', false, html));
+});
+
+document.getElementById('insertHrBtn').addEventListener('click', () => {
+  withFocusedPage(() => document.execCommand('insertHorizontalRule', false, null));
+});
+
+document.getElementById('insertDateBtn').addEventListener('click', () => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  withFocusedPage(() => document.execCommand('insertText', false, dateStr));
+});
+
+document.getElementById('findReplaceBtn').addEventListener('click', () => {
+  const page = lastFocusedPage || document.querySelector('.page');
+  if (!page) return;
+  const find = prompt('Cari kata/kalimat:');
+  if (!find) return;
+  const replace = prompt('Ganti dengan:', '') ?? '';
+  const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, null);
+  let count = 0;
+  let node;
+  const textNodes = [];
+  while ((node = walker.nextNode())) textNodes.push(node);
+  textNodes.forEach((tn) => {
+    if (tn.nodeValue.includes(find)) {
+      const parts = tn.nodeValue.split(find);
+      count += parts.length - 1;
+      tn.nodeValue = parts.join(replace);
+    }
+  });
+  updateWordCount();
+  showToast(count > 0 ? `Diganti ${count}x: "${find}" → "${replace}"` : `Tidak ditemukan: "${find}"`);
+});
+
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+const imageInput = document.getElementById('imageInput');
+document.getElementById('insertImageBtn').addEventListener('click', () => imageInput.click());
+imageInput.addEventListener('change', () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    withFocusedPage(() => document.execCommand('insertHTML', false, `<img src="${e.target.result}" alt="gambar" />`));
+  };
+  reader.readAsDataURL(file);
+  imageInput.value = '';
+});
+
+function updateWordCount() {
+  const text = getAllPages().map(p => p.innerText).join(' ').trim();
+  const count = text ? text.split(/\s+/).length : 0;
+  const chars = text.length;
+  wordCount.textContent = `${count} kata · ${chars} karakter`;
+}
+
+document.getElementById('newBtn').addEventListener('click', () => {
+  if (confirm('Buat dokumen baru? Semua halaman saat ini akan dihapus.')) {
+    pageWrap.innerHTML = '';
+    createPage('<p>Mulai ketik dokumen kamu di sini...</p>', null);
+    statusText.textContent = 'Dokumen Baru';
+    updateWordCount();
+  }
+});
+
+const fileInput = document.getElementById('fileInput');
+document.getElementById('openBtn').addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  try {
+    let html;
+    if (name.endsWith('.docx')) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      html = result.value;
+    } else if (name.endsWith('.html') || name.endsWith('.htm')) {
+      html = await file.text();
+    } else {
+      const text = await file.text();
+      html = text.split(/\r?\n/).map(l => `<p>${l || '<br>'}</p>`).join('');
+    }
+    pageWrap.innerHTML = '';
+    createPage(html, null);
+    statusText.textContent = file.name;
+    updateWordCount();
+    showToast('File berhasil dibuka: ' + file.name);
+  } catch (err) {
+    alert('Gagal membuka file: ' + err.message);
+  }
+  fileInput.value = '';
+});
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const pages = getAllPages();
+  const bodyHtml = pages.map((p, i) => {
+    const breakStyle = i > 0 ? "style='page-break-before:always;'" : '';
+    return `<div ${breakStyle}>${p.innerHTML}</div>`;
+  }).join('');
+
+  const buildFullHtml = (title) => `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>${title}</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+</head>
+<body>${bodyHtml}</body>
+</html>`;
+
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'Dokumen.doc',
+        types: [{ description: 'Word Document', accept: { 'application/msword': ['.doc'] } }],
+      });
+      const title = handle.name.replace(/\.docx?$/i, '');
+      const fullHtml = buildFullHtml(title);
+      const writable = await handle.createWritable();
+      await writable.write(new Blob(['\ufeff', fullHtml], { type: 'application/msword' }));
+      await writable.close();
+      statusText.textContent = handle.name + ' (tersimpan)';
+      showToast('Tersimpan di lokasi yang kamu pilih: ' + handle.name);
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+
+  const filename = prompt('Nama file? (browser kamu akan menyimpannya ke folder Downloads)', 'Dokumen') || 'Dokumen';
+  const fullHtml = buildFullHtml(filename);
+  const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.replace(/\.docx?$/i, '') + '.doc';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  statusText.textContent = filename + '.doc (tersimpan ke Downloads)';
+  showToast('Tersimpan ke folder Downloads: ' + filename + '.doc');
+});
+
+// init
+createPage('<p>Mulai ketik dokumen kamu di sini...</p>', null);
+updateWordCount();
+</script>
+</body>
+</html>
